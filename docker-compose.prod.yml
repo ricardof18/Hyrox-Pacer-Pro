@@ -1,0 +1,55 @@
+services:
+  backend:
+    build: ./backend
+    container_name: hyrox_backend_prod
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=mysql+pymysql://hyroxuser:${DB_PASSWORD}@db/hyrox_pacer_db
+      - SECRET_KEY=${SECRET_KEY}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - hyrox_prod_net
+
+  db:
+    image: mysql:8.0
+    container_name: hyrox_db_prod
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MYSQL_DATABASE: hyrox_pacer_db
+      MYSQL_USER: hyroxuser
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - hyrox_db_prod_data:/var/lib/mysql
+      - ./backend/app/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - hyrox_prod_net
+    healthcheck:
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost" ]
+      timeout: 10s
+      retries: 5
+
+  # Note: For free hosting like Render/Railway, you might only need backend + db.
+  # If deploying yourself, you can add a frontend build or Nginx here.
+  frontend:
+    # Example for static build deployment
+    image: node:18-alpine as build
+    # In a real CI/CD, this would be built and served via Nginx
+    # Placeholder for local prod simulation
+    build: ./frontend
+    container_name: hyrox_frontend_prod
+    environment:
+      - VITE_API_URL=${VITE_API_URL}
+    networks:
+      - hyrox_prod_net
+
+networks:
+  hyrox_prod_net:
+    driver: bridge
+
+volumes:
+  hyrox_db_prod_data:
