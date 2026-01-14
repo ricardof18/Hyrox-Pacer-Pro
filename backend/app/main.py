@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Depends, HTTPException, status, APIRouter
+from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
@@ -271,3 +272,7 @@ app.include_router(api_router)
 # Mount static files for Frontend - MUST BE LAST
 if os.path.exists("static"):
     app.mount("/", StaticFiles(directory="static", html=True), name="static")
+
+@app.get("/{catchall:path}")
+async def serve_frontend(catchall: str):
+    return FileResponse("static/index.html")
