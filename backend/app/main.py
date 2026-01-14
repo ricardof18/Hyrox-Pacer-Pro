@@ -271,8 +271,19 @@ app.include_router(api_router)
 
 # Mount static files for Frontend - MUST BE LAST
 if os.path.exists("static"):
+    # First, mount the assets folder explicitly if it exists
+    if os.path.exists("static/assets"):
+        app.mount("/assets", StaticFiles(directory="static/assets"), name="assets")
+    
+    # Generic mount for the root static folder
     app.mount("/", StaticFiles(directory="static", html=True), name="static")
 
 @app.get("/{catchall:path}")
 async def serve_frontend(catchall: str):
+    # Check if the requested path is actually a physical file in 'static'
+    file_path = os.path.join("static", catchall)
+    if os.path.exists(file_path) and os.path.isfile(file_path):
+        return FileResponse(file_path)
+        
+    # Fallback to index.html for SPA routing (React Router)
     return FileResponse("static/index.html")
