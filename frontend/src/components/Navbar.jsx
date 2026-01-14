@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { User, Settings, LogOut, ChevronDown } from 'lucide-react';
+import { User, Settings, LogOut, ChevronDown, Menu } from 'lucide-react';
 
-const Navbar = () => {
+const Navbar = ({ toggleSidebar }) => {
     const [dropdownOpen, setDropdownOpen] = useState(false);
     const [userName, setUserName] = useState(localStorage.getItem('user_name') || 'Guest');
     const [userRole, setUserRole] = useState(localStorage.getItem('user_role') || 'user');
@@ -29,13 +29,18 @@ const Navbar = () => {
 
     return (
         <header className="sticky top-0 z-40 w-full h-16 bg-[#121212]/80 backdrop-blur-md border-b border-[#333] flex items-center justify-between px-6 md:px-12">
-            {/* LEFT (Mobile Toggle Placeholder) */}
-            <div className="md:hidden">
-                {/* Burger Icon would go here */}
-            </div>
+            {/* LEFT (Mobile Toggle) */}
+            <div className="flex items-center space-x-4">
+                <button
+                    onClick={toggleSidebar}
+                    className="md:hidden p-2 text-gray-400 hover:text-white hover:bg-[#1a1a1a] rounded-lg transition"
+                >
+                    <Menu size={24} />
+                </button>
 
-            <div className="hidden md:block">
-                {/* Breadcrumbs or Title could go here */}
+                <div className="hidden md:block">
+                    {/* Breadcrumbs or Title could go here */}
+                </div>
             </div>
 
             {/* RIGHT - PROFILE DROPDOWN */}
