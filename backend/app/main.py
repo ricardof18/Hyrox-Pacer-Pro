@@ -7,6 +7,8 @@ from datetime import timedelta
 from typing import List, Optional
 import uuid
 from . import models, database, schemas, auth, pacer
+from fastapi.staticfiles import StaticFiles
+import os
 
 # Create tables
 def migrate_schema():
@@ -61,20 +63,25 @@ def startup_event():
                     email=admin_email,
                     password_hash=hashed_password,
                     full_name="System Admin",
-                    age=30,
-                    categoria_hyrox=models.HyroxCategory.PRO,
                     role=models.UserRole.ADMIN,
                     is_active=True
                 )
                 db.add(new_admin)
                 db.commit()
-                print(f"Admin user created: {admin_email} / admin123")
+                print("--- SEED: Admin user created ---", flush=True)
         finally:
             db.close()
+            
     except Exception as e:
-        print(f"Startup event warning (DB might be migrating): {e}")
+        print(f"--- STARTUP ERROR: {e} ---", flush=True)
 
-# ... existing code ...
+@app.get("/health")
+def health_check():
+    return {"status": "healthy", "service": "hyrox-pacer-api"}
+
+# Mount static files for Frontend
+if os.path.exists("static"):
+    app.mount("/", StaticFiles(directory="static", html=True), name="static")
 
 @app.post("/signup", response_model=schemas.UserResponse)
 def signup(user: schemas.UserCreate, db: Session = Depends(database.get_db)):
