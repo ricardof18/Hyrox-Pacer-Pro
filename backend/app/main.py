@@ -141,7 +141,9 @@ def calculate_pacer(request: schemas.PacerRequest):
             request.tempo_alvo, 
             request.categoria_hyrox, 
             request.preferred_run_pace,
-            request.roxzone_minutes
+            request.roxzone_minutes,
+            request.is_elite,
+            request.athlete_level
         )
         return result
     except Exception as e:

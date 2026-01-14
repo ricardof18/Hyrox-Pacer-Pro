@@ -35,6 +35,8 @@ const Pacer = () => {
     const [warning, setWarning] = useState(null);
     const [athleteNames, setAthleteNames] = useState({ A: 'Athlete A', B: 'Athlete B' });
     const [lastSavedSim, setLastSavedSim] = useState(null);
+    const [isElite, setIsElite] = useState(false);
+    const [athleteLevel, setAthleteLevel] = useState('Competitivo');
     const [searchParams, setSearchParams] = useSearchParams();
 
     const isDoubles = category.toLowerCase().includes('doubles');
@@ -103,7 +105,9 @@ const Pacer = () => {
                 tempo_alvo: targetTime,
                 categoria_hyrox: category,
                 preferred_run_pace: globalRunPace || null,
-                roxzone_minutes: parseFloat(roxzoneMinutes) || 0
+                roxzone_minutes: parseFloat(roxzoneMinutes) || 0,
+                is_elite: isElite || athleteLevel === 'Elite',
+                athlete_level: athleteLevel
             };
             const response = await api.post('/calculate-pacer', payload);
             let newSplits = response.data.splits;
@@ -365,6 +369,24 @@ const Pacer = () => {
                             <div>
                                 <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Roxzone (Total Min)</label>
                                 <input type="number" step="0.1" value={roxzoneMinutes} onChange={(e) => setRoxzoneMinutes(e.target.value)} className="w-full bg-[#121212] border border-[#333] text-white p-3 rounded font-mono focus:border-hyrox-orange outline-none" />
+                            </div>
+                            <div className="flex flex-col gap-2">
+                                <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest">Athlete Level</label>
+                                <div className="flex p-1 bg-black/40 border border-white/10 rounded-xl overflow-hidden shadow-inner translate-y-[-4px]">
+                                    {['Recreativo', 'Competitivo', 'Elite'].map((level) => (
+                                        <button
+                                            key={level}
+                                            type="button"
+                                            onClick={() => setAthleteLevel(level)}
+                                            className={`flex-1 py-2 px-3 text-[10px] font-black uppercase italic transition-all duration-300 rounded-lg ${athleteLevel === level
+                                                    ? 'bg-hyrox-orange text-white shadow-lg'
+                                                    : 'text-gray-500 hover:text-white hover:bg-white/5'
+                                                }`}
+                                        >
+                                            {level}
+                                        </button>
+                                    ))}
+                                </div>
                             </div>
                             {isDoubles && (
                                 <div className="col-span-1 md:col-span-4 grid grid-cols-2 gap-4 mt-4 p-4 border border-white/5 rounded-2xl bg-[#151515] ring-1 ring-white/5">

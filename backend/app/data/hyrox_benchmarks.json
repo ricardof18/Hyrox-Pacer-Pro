@@ -1,0 +1,35 @@
+{
+    "OPEN_M": {
+        "ski": 255,
+        "sled_push": 225,
+        "sled_pull": 310,
+        "burpees": 290,
+        "row": 260,
+        "farmers": 135,
+        "lunges": 330,
+        "wall_balls": 380,
+        "run_base": 300
+    },
+    "PRO_M": {
+        "ski": 235,
+        "sled_push": 190,
+        "sled_pull": 280,
+        "burpees": 260,
+        "row": 240,
+        "farmers": 150,
+        "lunges": 290,
+        "wall_balls": 340,
+        "run_base": 270
+    },
+    "DOUBLES_M": {
+        "ski": 220,
+        "sled_push": 160,
+        "sled_pull": 240,
+        "burpees": 230,
+        "row": 225,
+        "farmers": 120,
+        "lunges": 250,
+        "wall_balls": 270,
+        "run_base": 260
+    }
+}

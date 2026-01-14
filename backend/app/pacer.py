@@ -15,159 +15,147 @@ def format_seconds_to_time(seconds: int) -> str:
     h, m = divmod(m, 60)
     return "{:02d}:{:02d}:{:02d}".format(int(h), int(m), int(s))
 
-def calculate_splits(target_time_str: str, category: str, preferred_run_pace: str = None, roxzone_minutes: float = None):
+import json
+import os
+
+def load_benchmarks():
+    data_path = os.path.join(os.path.dirname(__file__), "data", "hyrox_benchmarks.json")
+    try:
+        with open(data_path, "r") as f:
+            return json.load(f)
+    except Exception as e:
+        print(f"Error loading benchmarks: {e}")
+        return {}
+
+def calculate_splits(target_time_str: str, category: str, preferred_run_pace: str = None, roxzone_minutes: float = None, is_elite: bool = False, athlete_level: str = "Competitivo"):
+    # 1. Initialization
     total_seconds = parse_time_to_seconds(target_time_str)
-    
-    
-    # 1. Base Weights & Station Setup
-    # (Roxzone calculated after category check)
+    cat_lower = category.lower()
+    level_lower = athlete_level.lower()
+    benchmarks_data = load_benchmarks()
 
+    # 2. Category Mapping to Benchmark Keys
+    bench_key = "OPEN_M"
+    if "pro" in cat_lower:
+        bench_key = "PRO_M"
+    elif "doubles" in cat_lower:
+        # If it's Doubles Pro, we could use PRO_M or a hybrid. 
+        # Requirement usually implies DOUBLES_M for general doubles.
+        # User specified DOUBLES_M in the JSON.
+        bench_key = "DOUBLES_M" if "pro" not in cat_lower else "PRO_M"
+    
+    bench = benchmarks_data.get(bench_key, benchmarks_data.get("OPEN_M"))
+    
+    # 3. Reference Values
+    bench_run_base = bench.get("run_base", 300) # seconds
+    user_run_pace_seconds = parse_time_to_seconds(preferred_run_pace) if preferred_run_pace else (total_seconds // 16) # Heuristic if none
+    
+    # Ratio Calculation
+    pace_ratio = user_run_pace_seconds / bench_run_base
 
-    stations = [
-        {"name": "Run 1 (1km)", "type": "run", "weight": 0.90},
-        {"name": "Ski Erg (1000m)", "type": "exercise", "weight": 1.0},
-        {"name": "Run 2 (1km)", "type": "run", "weight": 0.92},
-        {"name": "Sled Push (50m)", "type": "exercise", "weight": 0.9},
-        {"name": "Run 3 (1km)", "type": "run", "weight": 0.95},
-        {"name": "Sled Pull (50m)", "type": "exercise", "weight": 1.1},
-        {"name": "Run 4 (1km)", "type": "run", "weight": 1.05},
-        {"name": "Burpee Broad Jumps (80m)", "type": "exercise", "weight": 1.25},
-        {"name": "Run 5 (1km)", "type": "run", "weight": 1.05},
-        {"name": "Rowing (1000m)", "type": "exercise", "weight": 1.1},
-        {"name": "Run 6 (1km)", "type": "run", "weight": 1.05},
-        {"name": "Farmers Carry (200m)", "type": "exercise", "weight": 0.7},
-        {"name": "Run 7 (1km)", "type": "run", "weight": 1.1},
-        {"name": "Sandbag Lunges (100m)", "type": "exercise", "weight": 1.4},
-        {"name": "Run 8 (1km)", "type": "run", "weight": 1.2},
-        {"name": "Wall Balls (75/100)", "type": "exercise", "weight": 1.1},
+    # 4. Station Definitions & Proportional Calculation
+    # Based on: Tempo_Previsto = Benchmark_Estação * (Pace_Corrida_Utilizador / Run_Base_Categoria)
+    stations_config = [
+        {"name": "Run 1 (1km)", "type": "run", "key": None},
+        {"name": "Ski Erg (1000m)", "type": "exercise", "key": "ski"},
+        {"name": "Run 2 (1km)", "type": "run", "key": None},
+        {"name": "Sled Push (50m)", "type": "exercise", "key": "sled_push"},
+        {"name": "Run 3 (1km)", "type": "run", "key": None},
+        {"name": "Sled Pull (50m)", "type": "exercise", "key": "sled_pull"},
+        {"name": "Run 4 (1km)", "type": "run", "key": None},
+        {"name": "Burpee Broad Jumps (80m)", "type": "exercise", "key": "burpees"},
+        {"name": "Run 5 (1km)", "type": "run", "key": None},
+        {"name": "Rowing (1000m)", "type": "exercise", "key": "row"},
+        {"name": "Run 6 (1km)", "type": "run", "key": None},
+        {"name": "Farmers Carry (200m)", "type": "exercise", "key": "farmers"},
+        {"name": "Run 7 (1km)", "type": "run", "key": None},
+        {"name": "Sandbag Lunges (100m)", "type": "exercise", "key": "lunges"},
+        {"name": "Run 8 (1km)", "type": "run", "key": None},
+        {"name": "Wall Balls (75/100)", "type": "exercise", "key": "wall_balls"},
     ]
 
-    # Adjust weights based on Category
-    # Categories: Single Open, Single Pro, Doubles Men, Doubles Pro
-    cat_lower = category.lower()
+    # 5. Fatigue Logic (1.02 cumulative after 2nd station)
+    fatigue_base = 1.02
+    if level_lower == "elite" or is_elite:
+        fatigue_base = 1.01 # Elite has better recovery
     
-    if "pro" in cat_lower:
-        for s in stations:
-            if s["type"] == "exercise":
-                s["weight"] *= 1.15 # 15% harder exercises relative to run
+    # 6. Hard Caps (Ski 170s, Burpees 190s)
+    # Elite bypasses limits
+    bypass_limits = (level_lower == "elite" or is_elite)
 
-    if "doubles" in cat_lower:
-        for s in stations:
-            if s["type"] == "exercise":
-                s["weight"] *= 0.85 # 15% faster exercises for Doubles (split work)
+    results = []
+    exercise_count = 0
+    calculated_sum = 0
     
-    # Optional logic for Doubles? 
-    # Usually doubles run faster (fresh legs) but exercises are shared (split).
-    # If the calculator predicts for the TEAM, the exercise time might be halved (effectively fast), 
-    # but the run is consistent. 
-    # For now, we stick to the requested "Difficulty Factor" mainly on Pro.
-    # If Doubles needs specific logic, we can add here.
-    
-    # Roxzone adjustment
-    if roxzone_minutes is not None:
+    # Roxzone Calc
+    if roxzone_minutes and roxzone_minutes > 0:
         roxzone_seconds = int(roxzone_minutes * 60)
     else:
-        roxzone_factor = 0.08
+        # Defaults
+        roxzone_seconds = int(total_seconds * (0.10 if "doubles" in cat_lower else 0.08))
         if "doubles" in cat_lower:
-            roxzone_factor = 0.10 # 10% for Doubles
-            # Tag Time: Add 5 seconds per station (8 stations) for transitions
-            roxzone_seconds = (total_seconds * roxzone_factor) + (8 * 5)
+            roxzone_seconds += 40 # Tag transitions
+
+    for s in stations_config:
+        if s["type"] == "run":
+            station_time = user_run_pace_seconds
         else:
-            roxzone_seconds = total_seconds * roxzone_factor
-
-    active_seconds = total_seconds - roxzone_seconds
-    results = []
-    warning_message = None
-
-    if preferred_run_pace:
-        run_pace_seconds = parse_time_to_seconds(preferred_run_pace)
-        if run_pace_seconds == 0:
-            raise ValueError("Invalid preferred run pace format (MM:SS)")
-        
-        # Calculate total run time (8 runs)
-        # Note: We apply weights to runs too usually, but if user sets "Pace", is it Average Pace or Base Pace?
-        # Let's assume it's the BASE pace (Run 1 equivalent) and we strictly adhere to it for the average, 
-        # OR we scale it by fatigue? 
-        # Requirement says: "fixar todas as 8 corridas de 1km com esse tempo".
-        # So we fix ALL runs to this exact pace.
-        
-        fixed_run_time = run_pace_seconds
-        total_run_time_needed = fixed_run_time * 8
-        
-        remaining_for_exercises = active_seconds - total_run_time_needed
-        
-        # Validation: Is there enough time?
-        # Minimal viable exercise time check (very rough heuristic)
-        # e.g. World record exercises total ~25-30 mins. Average ~40 mins.
-        if remaining_for_exercises < (20 * 60): # Less than 20 mins for 8 exercises + roxzone adjustment?
-             warning_message = f"Warning: High Intensity! Only {format_seconds_to_time(int(remaining_for_exercises))} remaining for exercises."
-        
-        if remaining_for_exercises <= 0:
-             raise ValueError("Target time is impossible with this run pace! Reduce run pace or increase target time.")
-
-        # Distribute remaining time among EXERCISES only
-        exercise_stations = [s for s in stations if s["type"] == "exercise"]
-        total_exercise_weight = sum(s["weight"] for s in exercise_stations)
-        seconds_per_unit_exercise = remaining_for_exercises / total_exercise_weight
-
-        current_sum = 0
-        for i, s in enumerate(stations):
-            if s["type"] == "run":
-                station_time = fixed_run_time
-            else:
-                # Erg Logic: Pace is per 500m. 
-                # Formula: (Distance / 500) * PaceSec
-                # For Ski/Row it is usually 1000m.
-                # Here we use the weight as a multiplier for the 'average' base time.
-                station_time = int(s["weight"] * seconds_per_unit_exercise)
+            exercise_count += 1
+            bench_val = bench.get(s["key"], 300)
             
-            # Adjustment for last station to match target exactly
-            if i == len(stations) - 1:
-                station_time = active_seconds - current_sum
-
-            current_sum += int(station_time)
-            results.append({
-                "station": s["name"],
-                "type": s["type"],
-                "suggested_time_seconds": int(station_time),
-                "suggested_time_formatted": format_seconds_to_time(int(station_time))
-            })
-
-    else:
-        # Standard weighted distribution
-        total_weight = sum(s["weight"] for s in stations)
-        seconds_per_unit = active_seconds / total_weight
-        
-        current_sum = 0
-        for i, s in enumerate(stations):
-            station_time = int(s["weight"] * seconds_per_unit)
+            # Base Proportional
+            station_time = bench_val * pace_ratio
             
-            # Adjustment for last station
-            if i == len(stations) - 1:
-                station_time = active_seconds - current_sum
-
-            current_sum += int(station_time)
+            # Fatigue: Multiplicador de 1.02 (acumulativo) a cada estação após a segunda.
+            if exercise_count > 2:
+                fatigue_multiplier = fatigue_base ** (exercise_count - 2)
+                station_time *= fatigue_multiplier
             
-            split_result = {
-                "station": s["name"],
-                "type": s["type"],
-                "suggested_time_seconds": int(station_time),
-                "suggested_time_formatted": format_seconds_to_time(int(station_time))
-            }
-            
-            # Add pace per 500m for Ergs
-            if "Erg" in s["name"] or "Rowing" in s["name"]:
-                # Formula: StationTime = (Distance / 500) * Pace -> Pace = StationTime / (Distance / 500)
-                # Distance is 1000m for both
-                pace_seconds = int(station_time) / 2
-                split_result["pace_per_500m"] = format_seconds_to_time(int(pace_seconds))[3:] # format as MM:SS
+            # Athlete Level Adjustments
+            if level_lower == "recreativo":
+                # Recreativo takes 15% longer on strength (non-ergs)
+                if s["key"] not in ["ski", "row"]:
+                    station_time *= 1.15
 
-            results.append(split_result)
-        
+            # Hard Caps (Ski 170s, Burpees 190s)
+            if not bypass_limits:
+                if s["key"] == "ski":
+                    station_time = max(station_time, 170)
+                if s["key"] == "burpees":
+                    station_time = max(station_time, 190)
+
+        calculated_sum += int(station_time)
+        results.append({
+            "station": s["name"],
+            "type": s["type"],
+            "suggested_time_seconds": int(station_time),
+            "suggested_time_formatted": format_seconds_to_time(int(station_time))[3:] # MM:SS
+        })
+
+    # Add pace per 500m for Ergs
+    for r in results:
+        if "Ski" in r["station"] or "Row" in r["station"]:
+            pace_seconds = r["suggested_time_seconds"] / 2
+            r["pace_per_500m"] = format_seconds_to_time(int(pace_seconds))[3:]
+
+    # Final Adjustment to meet Target Time (adjusting exercises if needed)
+    actual_total = calculated_sum + roxzone_seconds
+    diff = total_seconds - actual_total
+    
+    # We apply the difference to non-cap-bound exercise stations to maintain realism
+    if abs(diff) > 5:
+        adj_targets = [r for r in results if r["type"] == "exercise" and "Ski" not in r["station"] and "Burpee" not in r["station"]]
+        if adj_targets:
+            per_station_adj = diff // len(adj_targets)
+            for r in adj_targets:
+                r["suggested_time_seconds"] += int(per_station_adj)
+                r["suggested_time_formatted"] = format_seconds_to_time(int(r["suggested_time_seconds"]))[3:]
+
     return {
         "target_time": target_time_str,
         "roxzone_total_seconds": int(roxzone_seconds),
-        "roxzone_formatted": format_seconds_to_time(int(roxzone_seconds)),
+        "roxzone_formatted": format_seconds_to_time(int(roxzone_seconds))[3:],
         "splits": results,
-        "warning": warning_message
+        "athlete_level": athlete_level,
+        "bench_category": bench_key
     }

@@ -59,6 +59,8 @@ class PacerRequest(BaseModel):
     categoria_hyrox: str
     preferred_run_pace: Optional[str] = None
     roxzone_minutes: Optional[float] = None
+    is_elite: bool = False
+    athlete_level: str = "Competitivo"
 
 
 class RecoveryLogBase(BaseModel):
