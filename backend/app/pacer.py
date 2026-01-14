@@ -115,6 +115,10 @@ def calculate_splits(target_time_str: str, category: str, preferred_run_pace: st
             if s["type"] == "run":
                 station_time = fixed_run_time
             else:
+                # Erg Logic: Pace is per 500m. 
+                # Formula: (Distance / 500) * PaceSec
+                # For Ski/Row it is usually 1000m.
+                # Here we use the weight as a multiplier for the 'average' base time.
                 station_time = int(s["weight"] * seconds_per_unit_exercise)
             
             # Adjustment for last station to match target exactly

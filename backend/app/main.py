@@ -46,6 +46,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.get("/health")
+def health_check():
+    return {"status": "ok"}
+
 @app.on_event("startup")
 def startup_event():
     try:
@@ -74,14 +78,6 @@ def startup_event():
             
     except Exception as e:
         print(f"--- STARTUP ERROR: {e} ---", flush=True)
-
-@app.get("/health")
-def health_check():
-    return {"status": "healthy", "service": "hyrox-pacer-api"}
-
-# Mount static files for Frontend
-if os.path.exists("static"):
-    app.mount("/", StaticFiles(directory="static", html=True), name="static")
 
 @app.post("/signup", response_model=schemas.UserResponse)
 def signup(user: schemas.UserCreate, db: Session = Depends(database.get_db)):
@@ -296,15 +292,6 @@ def upgrade_user(request: UpgradeRequest, db: Session = Depends(database.get_db)
     db.commit()
     return {"message": f"Successfully upgraded to {request.new_role}", "role": request.new_role}
 
-@app.get("/health")
-def health_check(db: Session = Depends(database.get_db)):
-    try:
-        # Try to execute a simple query to check DB connection
-        db.execute(text("SELECT 1"))
-        return {"status": "ok", "database": "connected"}
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"Database connection failed: {str(e)}"
-        )
-
+# Mount static files for Frontend - MUST BE LAST
+if os.path.exists("static"):
+    app.mount("/", StaticFiles(directory="static", html=True), name="static")
