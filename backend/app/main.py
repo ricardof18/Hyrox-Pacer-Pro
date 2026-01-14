@@ -273,24 +273,28 @@ app.include_router(api_router)
 static_dir = "/app/static"
 
 if os.path.exists(static_dir):
-    # Serve assets
+    # Serve assets folder specifically
     assets_path = os.path.join(static_dir, "assets")
     if os.path.exists(assets_path):
         app.mount("/assets", StaticFiles(directory=assets_path), name="assets")
     
-    # Generic mount for root
+    # Generic mount for the root static folder
     app.mount("/", StaticFiles(directory=static_dir, html=True), name="frontend")
 
 @app.get("/{catchall:path}")
 async def serve_frontend(catchall: str):
-    # Check if physical file exists
+    # If it's an API request that hasn't matched a route, return regular 404
+    if catchall.startswith("api/"):
+        return {"detail": "Not Found"}
+        
+    # Check if the requested path is a physical file or directory
     file_path = os.path.join(static_dir, catchall)
     if os.path.exists(file_path) and os.path.isfile(file_path):
         return FileResponse(file_path)
         
-    # SPA Fallback
+    # SPA Fallback: serve index.html for all other routes so React can handle them
     index_path = os.path.join(static_dir, "index.html")
     if os.path.exists(index_path):
         return FileResponse(index_path)
     
-    return {"detail": "Frontend not found"}
+    return {"detail": "Frontend assets not found"}

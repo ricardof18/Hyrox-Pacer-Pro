@@ -1,10 +1,13 @@
 #!/bin/sh
+echo "--- A iniciar ambiente Railway ---"
+# O Docker coloca tudo em /app, vamos garantir que estamos lá
+cd /app
 
-echo "--- Running Database Migrations ---"
-python migrate_db.py
+# Correr migrações (usando o caminho absoluto do Docker)
+python3 migrate_db.py || echo "Aviso: migrate_db.py não encontrado na raiz"
 
-echo "--- Setting Admin Role ---"
-python app/set_admin.py
+# Correr script de admin
+python3 app/set_admin.py || echo "Aviso: set_admin.py não encontrado em app/"
 
-echo "--- Starting Uvicorn ---"
-exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}
+# Iniciar o servidor
+exec uvicorn app.main:app --host 0.0.0.0 --port $PORT
