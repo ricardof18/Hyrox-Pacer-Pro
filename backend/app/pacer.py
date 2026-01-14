@@ -147,12 +147,22 @@ def calculate_splits(target_time_str: str, category: str, preferred_run_pace: st
                 station_time = active_seconds - current_sum
 
             current_sum += int(station_time)
-            results.append({
+            
+            split_result = {
                 "station": s["name"],
                 "type": s["type"],
                 "suggested_time_seconds": int(station_time),
                 "suggested_time_formatted": format_seconds_to_time(int(station_time))
-            })
+            }
+            
+            # Add pace per 500m for Ergs
+            if "Erg" in s["name"] or "Rowing" in s["name"]:
+                # Formula: StationTime = (Distance / 500) * Pace -> Pace = StationTime / (Distance / 500)
+                # Distance is 1000m for both
+                pace_seconds = int(station_time) / 2
+                split_result["pace_per_500m"] = format_seconds_to_time(int(pace_seconds))[3:] # format as MM:SS
+
+            results.append(split_result)
         
     return {
         "target_time": target_time_str,

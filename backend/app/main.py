@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi import FastAPI, Depends, HTTPException, status, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
@@ -46,6 +46,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Create API Router
+api_router = APIRouter(prefix="/api")
+
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
@@ -59,7 +62,6 @@ def startup_event():
         db = database.SessionLocal()
         try:
             admin_email = "admin@hyrox.com"
-            # First check if table exists and has columns to avoid crash
             admin = db.query(models.User).filter(models.User.email == admin_email).first()
             if not admin:
                 hashed_password = auth.get_password_hash("admin123")
@@ -79,7 +81,7 @@ def startup_event():
     except Exception as e:
         print(f"--- STARTUP ERROR: {e} ---", flush=True)
 
-@app.post("/signup", response_model=schemas.UserResponse)
+@api_router.post("/signup", response_model=schemas.UserResponse)
 def signup(user: schemas.UserCreate, db: Session = Depends(database.get_db)):
     db_user = db.query(models.User).filter(models.User.email == user.email).first()
     if db_user:
@@ -92,37 +94,15 @@ def signup(user: schemas.UserCreate, db: Session = Depends(database.get_db)):
         full_name=user.full_name,
         age=user.age,
         categoria_hyrox=user.categoria_hyrox,
-        role=user.role # Allow role selection if passed, defaults to USER
+        role=user.role 
     )
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
     return new_user
 
-# ... login ...
-
-# ... existing endpoints ...
-
-@app.get("/users", response_model=List[schemas.UserResponse])
-def read_users(skip: int = 0, limit: int = 100, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_admin_user)):
-    users = db.query(models.User).offset(skip).limit(limit).all()
-    return users
-
-@app.delete("/users/{user_id}")
-def delete_user(user_id: int, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_admin_user)):
-    user = db.query(models.User).filter(models.User.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    db.delete(user)
-    db.commit()
-    return {"ok": true}
-
-# ... health_check ...
-
-@app.post("/login", response_model=schemas.Token)
+@api_router.post("/login", response_model=schemas.Token)
 def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(database.get_db)):
-    # OAuth2PasswordRequestForm expects 'username' and 'password' fields. 
-    # We treat 'username' as email.
     user = db.query(models.User).filter(models.User.email == form_data.username).first()
     if not user or not auth.verify_password(form_data.password, user.password_hash):
         raise HTTPException(
@@ -149,13 +129,11 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
         "user_email": user.email
     }
 
-@app.get("/users/me", response_model=schemas.UserResponse)
+@api_router.get("/users/me", response_model=schemas.UserResponse)
 def read_users_me(current_user: models.User = Depends(auth.get_current_user)):
     return current_user
 
-
-
-@app.post("/calculate-pacer")
+@api_router.post("/calculate-pacer")
 def calculate_pacer(request: schemas.PacerRequest):
     try:
         result = pacer.calculate_splits(
@@ -168,9 +146,7 @@ def calculate_pacer(request: schemas.PacerRequest):
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-import uuid
-
-@app.post("/simulations", response_model=schemas.SimulationResponse)
+@api_router.post("/simulations", response_model=schemas.SimulationResponse)
 def create_simulation(simulation: schemas.SimulationCreate, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
     db_sim = models.Simulation(
         user_id=current_user.id,
@@ -183,19 +159,19 @@ def create_simulation(simulation: schemas.SimulationCreate, db: Session = Depend
     db.refresh(db_sim)
     return db_sim
 
-@app.get("/share/{token}", response_model=schemas.SimulationResponse)
+@api_router.get("/share/{token}", response_model=schemas.SimulationResponse)
 def get_shared_simulation(token: str, db: Session = Depends(database.get_db)):
     sim = db.query(models.Simulation).filter(models.Simulation.share_token == token).first()
     if not sim:
         raise HTTPException(status_code=404, detail="Shared plan not found")
     return sim
 
-@app.get("/simulations/me", response_model=List[schemas.SimulationResponse])
+@api_router.get("/simulations/me", response_model=List[schemas.SimulationResponse])
 def read_my_simulations(db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
     simulations = db.query(models.Simulation).filter(models.Simulation.user_id == current_user.id).order_by(models.Simulation.created_at.desc()).all()
     return simulations
 
-@app.delete("/simulations/{simulation_id}")
+@api_router.delete("/simulations/{simulation_id}")
 def delete_simulation(simulation_id: int, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
     sim = db.query(models.Simulation).filter(models.Simulation.id == simulation_id, models.Simulation.user_id == current_user.id).first()
     if not sim:
@@ -204,7 +180,7 @@ def delete_simulation(simulation_id: int, db: Session = Depends(database.get_db)
     db.commit()
     return {"message": "Simulation deleted"}
 
-@app.get("/admin/users", response_model=List[schemas.UserResponse])
+@api_router.get("/admin/users", response_model=List[schemas.UserResponse])
 def admin_read_users(
     skip: int = 0, 
     limit: int = 100, 
@@ -222,7 +198,7 @@ def admin_read_users(
         )
     return query.offset(skip).limit(limit).all()
 
-@app.patch("/admin/users/{user_id}", response_model=schemas.UserResponse)
+@api_router.patch("/admin/users/{user_id}", response_model=schemas.UserResponse)
 def admin_update_user(
     user_id: int, 
     update: schemas.AdminUserUpdate, 
@@ -246,7 +222,7 @@ def admin_update_user(
     db.refresh(user)
     return user
 
-@app.post("/admin/users/{user_id}/reset-password")
+@api_router.post("/admin/users/{user_id}/reset-password")
 def admin_reset_password(
     user_id: int, 
     db: Session = Depends(database.get_db), 
@@ -262,7 +238,7 @@ def admin_reset_password(
     
     return {"message": "Password reset successful", "temporary_password": temp_password}
 
-@app.post("/recovery/logs", response_model=schemas.RecoveryLogResponse)
+@api_router.post("/recovery/logs", response_model=schemas.RecoveryLogResponse)
 def create_recovery_log(log: schemas.RecoveryLogCreate, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
     db_log = models.RecoveryLog(
         user_id=current_user.id,
@@ -275,22 +251,22 @@ def create_recovery_log(log: schemas.RecoveryLogCreate, db: Session = Depends(da
     db.refresh(db_log)
     return db_log
 
-@app.get("/recovery/logs/me", response_model=List[schemas.RecoveryLogResponse])
+@api_router.get("/recovery/logs/me", response_model=List[schemas.RecoveryLogResponse])
 def read_my_recovery_logs(db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
     logs = db.query(models.RecoveryLog).filter(models.RecoveryLog.user_id == current_user.id).order_by(models.RecoveryLog.created_at.desc()).all()
     return logs
 
-class UpgradeRequest(schemas.BaseModel):
-    new_role: str
-
-@app.post("/users/upgrade")
-def upgrade_user(request: UpgradeRequest, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
+@api_router.post("/users/upgrade")
+def upgrade_user(request: auth.UpgradeRequest, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
     if request.new_role not in ["pro", "coach"]:
         raise HTTPException(status_code=400, detail="Invalid role")
     
     current_user.role = request.new_role
     db.commit()
     return {"message": f"Successfully upgraded to {request.new_role}", "role": request.new_role}
+
+# Include the API router
+app.include_router(api_router)
 
 # Mount static files for Frontend - MUST BE LAST
 if os.path.exists("static"):
