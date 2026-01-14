@@ -1,9 +1,11 @@
 # Stage 1: Build Frontend
 FROM node:18-alpine AS frontend-builder
-WORKDIR /frontend
+WORKDIR /app/frontend
 COPY frontend/package*.json ./
 RUN npm install
 COPY frontend/ .
+# Fix permission for vite and other binaries
+RUN chmod -R +x node_modules/.bin
 RUN npm run build
 
 # Stage 2: Final Image
@@ -25,9 +27,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY backend/ .
 
 # Copy built frontend from Stage 1
-COPY --from=frontend-builder /frontend/dist /app/static
+# Note: Stage 1 WORKDIR was /app/frontend, so the build output is in /app/frontend/dist
+COPY --from=frontend-builder /app/frontend/dist /app/static
 
-# Copy start script and make it executable
+# Copy start script to root and make it executable
 COPY backend/app/start.sh /app/start.sh
 RUN chmod +x /app/start.sh
 
