@@ -26,9 +26,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy backend code
 COPY backend/ .
 
-# Copy built frontend from Stage 1
-# Note: Stage 1 WORKDIR was /app/frontend, so the build output is in /app/frontend/dist
-COPY --from=frontend-builder /app/frontend/dist /app/static
+# Copy built frontend from Stage 1 to /app/frontend/dist
+# This matches the OS.PATH logic in main.py
+COPY --from=frontend-builder /app/frontend/dist /app/frontend/dist
 
 # Copy start script to root and make it executable
 COPY backend/app/start.sh /app/start.sh

@@ -269,21 +269,29 @@ def upgrade_user(request: auth.UpgradeRequest, db: Session = Depends(database.ge
 # Include the API router
 app.include_router(api_router)
 
-# Mount static files for Frontend - MUST BE LAST
-if os.path.exists("static"):
-    # First, mount the assets folder explicitly if it exists
-    if os.path.exists("static/assets"):
-        app.mount("/assets", StaticFiles(directory="static/assets"), name="assets")
+# --- FRONTEND SERVING & SPA FALLBACK ---
+# Define path to frontend/dist
+frontend_dist = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
+
+if os.path.exists(frontend_dist):
+    # Serve assets
+    assets_path = os.path.join(frontend_dist, "assets")
+    if os.path.exists(assets_path):
+        app.mount("/assets", StaticFiles(directory=assets_path), name="assets")
     
-    # Generic mount for the root static folder
-    app.mount("/", StaticFiles(directory="static", html=True), name="static")
+    # Generic mount for root
+    app.mount("/", StaticFiles(directory=frontend_dist, html=True), name="frontend")
 
 @app.get("/{catchall:path}")
 async def serve_frontend(catchall: str):
-    # Check if the requested path is actually a physical file in 'static'
-    file_path = os.path.join("static", catchall)
+    # Check if physical file exists
+    file_path = os.path.join(frontend_dist, catchall)
     if os.path.exists(file_path) and os.path.isfile(file_path):
         return FileResponse(file_path)
         
-    # Fallback to index.html for SPA routing (React Router)
-    return FileResponse("static/index.html")
+    # SPA Fallback
+    index_path = os.path.join(frontend_dist, "index.html")
+    if os.path.exists(index_path):
+        return FileResponse(index_path)
+    
+    return {"detail": "Frontend not found"}
