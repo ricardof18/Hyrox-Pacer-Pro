@@ -270,27 +270,26 @@ def upgrade_user(request: auth.UpgradeRequest, db: Session = Depends(database.ge
 app.include_router(api_router)
 
 # --- FRONTEND SERVING & SPA FALLBACK ---
-# Define path to frontend/dist
-frontend_dist = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
+static_dir = "/app/static"
 
-if os.path.exists(frontend_dist):
+if os.path.exists(static_dir):
     # Serve assets
-    assets_path = os.path.join(frontend_dist, "assets")
+    assets_path = os.path.join(static_dir, "assets")
     if os.path.exists(assets_path):
         app.mount("/assets", StaticFiles(directory=assets_path), name="assets")
     
     # Generic mount for root
-    app.mount("/", StaticFiles(directory=frontend_dist, html=True), name="frontend")
+    app.mount("/", StaticFiles(directory=static_dir, html=True), name="frontend")
 
 @app.get("/{catchall:path}")
 async def serve_frontend(catchall: str):
     # Check if physical file exists
-    file_path = os.path.join(frontend_dist, catchall)
+    file_path = os.path.join(static_dir, catchall)
     if os.path.exists(file_path) and os.path.isfile(file_path):
         return FileResponse(file_path)
         
     # SPA Fallback
-    index_path = os.path.join(frontend_dist, "index.html")
+    index_path = os.path.join(static_dir, "index.html")
     if os.path.exists(index_path):
         return FileResponse(index_path)
     
