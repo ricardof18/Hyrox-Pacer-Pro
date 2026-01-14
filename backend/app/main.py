@@ -269,32 +269,30 @@ def upgrade_user(request: auth.UpgradeRequest, db: Session = Depends(database.ge
 # Include the API router
 app.include_router(api_router)
 
-# --- FRONTEND SERVING & SPA FALLBACK ---
-static_dir = "/app/static"
+# --- FRONTEND SERVING & DEFINITIVE SPA FALLBACK ---
+# O Docker coloca o frontend em /app/static
+STATIC_PATH = "/app/static"
 
-if os.path.exists(static_dir):
-    # Serve assets folder specifically
-    assets_path = os.path.join(static_dir, "assets")
-    if os.path.exists(assets_path):
-        app.mount("/assets", StaticFiles(directory=assets_path), name="assets")
-    
-    # Generic mount for the root static folder
-    app.mount("/", StaticFiles(directory=static_dir, html=True), name="frontend")
+# 1. Montar assets se a pasta existir
+if os.path.exists(os.path.join(STATIC_PATH, "assets")):
+    app.mount("/assets", StaticFiles(directory=os.path.join(STATIC_PATH, "assets")), name="assets")
 
+# 2. Rota Catch-all (SPA Fallback)
 @app.get("/{catchall:path}")
 async def serve_frontend(catchall: str):
-    # If it's an API request that hasn't matched a route, return regular 404
+    # Se for um pedido para a API que não existe, mantém o 404 de API
     if catchall.startswith("api/"):
         return {"detail": "Not Found"}
-        
-    # Check if the requested path is a physical file or directory
-    file_path = os.path.join(static_dir, catchall)
-    if os.path.exists(file_path) and os.path.isfile(file_path):
-        return FileResponse(file_path)
-        
-    # SPA Fallback: serve index.html for all other routes so React can handle them
-    index_path = os.path.join(static_dir, "index.html")
-    if os.path.exists(index_path):
-        return FileResponse(index_path)
+
+    # Tenta servir ficheiros reais (favicon, etc)
+    full_path = os.path.join(STATIC_PATH, catchall)
+    if os.path.exists(full_path) and os.path.isfile(full_path):
+        return FileResponse(full_path)
+
+    # Serve o index.html para QUALQUER outra rota (ex: /dashboard)
+    # Isto permite que o React/Vue trate do roteamento
+    index_file = os.path.join(STATIC_PATH, "index.html")
+    if os.path.exists(index_file):
+        return FileResponse(index_file)
     
     return {"detail": "Frontend assets not found"}

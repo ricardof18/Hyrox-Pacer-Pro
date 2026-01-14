@@ -1,13 +1,13 @@
 #!/bin/sh
-echo "--- A iniciar ambiente Railway ---"
-# O Docker coloca tudo em /app, vamos garantir que estamos lá
+# Navegar para a raiz da aplicação no Docker
 cd /app
 
-# Correr migrações (usando o caminho absoluto do Docker)
-python3 migrate_db.py || echo "Aviso: migrate_db.py não encontrado na raiz"
+# Tentar rodar migrações (se o ficheiro existir)
+python3 migrate_db.py || echo "Migrate script não encontrado"
 
-# Correr script de admin
-python3 app/set_admin.py || echo "Aviso: set_admin.py não encontrado em app/"
+# Tornar o Ricardo Admin (Garante que este script existe em app/set_admin.py)
+python3 app/set_admin.py || echo "Erro ao definir admin"
 
-# Iniciar o servidor
+# Iniciar o Uvicorn apontando para o módulo correto
+# Como estamos em /app e o main está em app/main.py:
 exec uvicorn app.main:app --host 0.0.0.0 --port $PORT
