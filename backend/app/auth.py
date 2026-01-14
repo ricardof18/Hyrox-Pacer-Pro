@@ -2,6 +2,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 from jose import JWTError, jwt
 from passlib.context import CryptContext
+from pydantic import BaseModel
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
@@ -63,3 +64,6 @@ async def get_current_admin_user(current_user: models.User = Depends(get_current
             detail="The user doesn't have enough privileges",
         )
     return current_user
+
+class UpgradeRequest(BaseModel):
+    new_role: str
